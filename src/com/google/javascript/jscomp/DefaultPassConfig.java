@@ -80,7 +80,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.jspecify.nullness.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Pass factories and meta-data for native JSCompiler passes.
@@ -151,6 +151,10 @@ public final class DefaultPassConfig extends PassConfig {
     passes.maybeAdd(checkSuper);
 
     TranspilationPasses.addTranspilationRuntimeLibraries(passes);
+
+    if (options.getInstrumentAsyncContext()) {
+      TranspilationPasses.addInstrumentAsyncContextPass(passes);
+    }
 
     if (options.needsTranspilationFrom(ES2015)) {
       if (options.getRewritePolyfills()) {
@@ -513,6 +517,8 @@ public final class DefaultPassConfig extends PassConfig {
       passes.maybeAdd(createEmptyPass(PassNames.BEFORE_STANDARD_OPTIMIZATIONS));
       passes.maybeAdd(inlineAndCollapseProperties);
       passes.maybeAdd(closureOptimizePrimitives);
+      // If side-effects were protected, remove the protection now.
+      passes.maybeAdd(stripSideEffectProtection);
       return passes;
     }
 
@@ -547,6 +553,18 @@ public final class DefaultPassConfig extends PassConfig {
     }
 
     TranspilationPasses.addTranspilationRuntimeLibraries(passes);
+
+    // NOTE: This pass is conceptually similar to RewritePolyfills, since it's required by usage
+    // of a particular runtime value (AsyncContext.Variable), rather than by any recognizable
+    // syntax.  But it differs because it makes syntax transformations, rather than simply injecting
+    // runtime library code.  It should run _before_ `await` is tranfsormed to `yield` for
+    // pre-ES2017 output versions, since in that case instrumenting `await` is not required, and the
+    // corresponding `yield`s can also be skipped.  It should also run before generators are
+    // rewritten since it needs to recognize the `yield` syntax.  Both of these happen during the
+    // post-normalization passes.
+    if (options.getInstrumentAsyncContext()) {
+      TranspilationPasses.addInstrumentAsyncContextPass(passes);
+    }
 
     if (options.rewritePolyfills || options.getIsolatePolyfills()) {
       TranspilationPasses.addRewritePolyfillPass(passes);
@@ -606,11 +624,6 @@ public final class DefaultPassConfig extends PassConfig {
     passes.maybeAdd(gatherExternPropertiesOptimize);
 
     passes.maybeAdd(createEmptyPass(PassNames.BEFORE_STANDARD_OPTIMIZATIONS));
-
-    // Optimizes references to the arguments variable.
-    if (options.optimizeArgumentsArray) {
-      passes.maybeAdd(optimizeArgumentsArray);
-    }
 
     // Abstract method removal works best on minimally modified code, and also
     // only needs to run once.
@@ -2088,13 +2101,6 @@ public final class DefaultPassConfig extends PassConfig {
                   })
           .build();
 
-  /** Optimizes the "arguments" array. */
-  private final PassFactory optimizeArgumentsArray =
-      PassFactory.builder()
-          .setName(PassNames.OPTIMIZE_ARGUMENTS_ARRAY)
-          .setInternalFactory(OptimizeArgumentsArray::new)
-          .build();
-
   /** Remove variables set to goog.abstractMethod. */
   private final PassFactory closureCodeRemoval =
       PassFactory.builder()
@@ -2680,15 +2686,7 @@ public final class DefaultPassConfig extends PassConfig {
 
   /** Rewrites Polymer({}) */
   private final PassFactory polymerPass =
-      PassFactory.builder()
-          .setName("polymerPass")
-          .setInternalFactory(
-              (compiler) ->
-                  new PolymerPass(
-                      compiler,
-                      compiler.getOptions().propertyRenaming
-                          == PropertyRenamingPolicy.ALL_UNQUOTED))
-          .build();
+      PassFactory.builder().setName("polymerPass").setInternalFactory(PolymerPass::new).build();
 
   private final PassFactory chromePass =
       PassFactory.builder().setName("chromePass").setInternalFactory(ChromePass::new).build();
@@ -2772,9 +2770,10 @@ public final class DefaultPassConfig extends PassConfig {
                   (externs, js) -> {
                     new ConvertTypesToColors(
                             compiler,
-                            compiler.getOptions().shouldSerializeExtraDebugInfo()
-                                ? SerializationOptions.INCLUDE_DEBUG_INFO
-                                : SerializationOptions.SKIP_DEBUG_INFO)
+                            SerializationOptions.builder()
+                                .setIncludeDebugInfo(
+                                    compiler.getOptions().shouldSerializeExtraDebugInfo())
+                                .build())
                         .process(externs, js);
 
                     compiler.setLifeCycleStage(LifeCycleStage.COLORS_AND_SIMPLIFIED_JSDOC);
@@ -2790,9 +2789,12 @@ public final class DefaultPassConfig extends PassConfig {
                   SerializeTypedAstPass.createFromPath(
                       compiler,
                       options.getTypedAstOutputFile(),
-                      compiler.getOptions().shouldSerializeExtraDebugInfo()
-                          ? SerializationOptions.INCLUDE_DEBUG_INFO
-                          : SerializationOptions.SKIP_DEBUG_INFO))
+                      SerializationOptions.builder()
+                          .setIncludeDebugInfo(
+                              compiler.getOptions().shouldSerializeExtraDebugInfo())
+                          // set the runtime libraries to serialize in the TypedAST proto
+                          .setRuntimeLibraries(compiler.getInjectedLibraries())
+                          .build()))
           .build();
 
   private final PassFactory removeUnnecessarySyntheticExterns =

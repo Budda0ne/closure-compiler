@@ -401,7 +401,6 @@ public final class IntegrationTest extends IntegrationTestCase {
     CompilerOptions options = createCompilerOptions();
     options.setFoldConstants(true);
     options.setInlineVariables(true);
-    options.setRemoveUnreachableCode(true);
     test(options, "var x; x && alert(1);", "");
   }
 
@@ -1351,18 +1350,6 @@ public final class IntegrationTest extends IntegrationTestCase {
   }
 
   @Test
-  public void testOptimizeArgumentsArray() {
-    String code = "function f() { return arguments[0]; }";
-
-    CompilerOptions options = createCompilerOptions();
-    testSame(options, code);
-
-    options.setOptimizeArgumentsArray(true);
-    String argName = "JSCompiler_OptimizeArgumentsArray_p0";
-    test(options, code, "function f(" + argName + ") { return " + argName + "; }");
-  }
-
-  @Test
   public void testOptimizeParameters() {
     String code = "function f(a) {} f(true);";
 
@@ -1476,7 +1463,6 @@ public final class IntegrationTest extends IntegrationTestCase {
     options.setClosurePass(true);
     options.setCheckTypes(true);
     options.setDisambiguateProperties(true);
-    options.setRemoveUnreachableCode(true);
     options.setRemoveAbstractMethods(true);
     test(
         options,
@@ -1504,7 +1490,6 @@ public final class IntegrationTest extends IntegrationTestCase {
     options.setCheckTypes(true);
     options.setDisambiguateProperties(true);
     options.setPropertiesThatMustDisambiguate(ImmutableSet.of("a"));
-    options.setRemoveUnreachableCode(true);
     options.setRemoveAbstractMethods(true);
     test(
         options,
@@ -1784,7 +1769,6 @@ public final class IntegrationTest extends IntegrationTestCase {
 
     options.setCheckTypes(true);
     options.setDisambiguateProperties(true);
-    options.setRemoveUnreachableCode(true);
     options.setRemoveUnusedVariables(Reach.ALL);
     options.setRemoveUnusedPrototypeProperties(true);
     options.setSmartNameRemoval(true);
@@ -1832,7 +1816,6 @@ public final class IntegrationTest extends IntegrationTestCase {
 
     options.setCheckTypes(true);
     options.setDisambiguateProperties(true);
-    options.setRemoveUnreachableCode(true);
     options.setRemoveUnusedVariables(Reach.ALL);
     options.setRemoveUnusedPrototypeProperties(true);
     options.setSmartNameRemoval(true);
@@ -2837,7 +2820,7 @@ public final class IntegrationTest extends IntegrationTestCase {
         lines(
             "class Foo {",
             "  bar() {",
-            "    return $jscomp.asyncExecutePromiseGeneratorFunction(function*() {",
+            "    return (0, $jscomp.asyncExecutePromiseGeneratorFunction)(function*() {",
             "      console.log(\"bar\");",
             "    });",
             "  }",
@@ -2847,7 +2830,7 @@ public final class IntegrationTest extends IntegrationTestCase {
             "    const $jscomp$async$this$98447280$3 = this, $jscomp$async$super$get$98447280$5$bar"
                 + " =",
             "        () => super.bar;",
-            "    return $jscomp.asyncExecutePromiseGeneratorFunction(function*() {",
+            "    return (0, $jscomp.asyncExecutePromiseGeneratorFunction)(function*() {",
             "      yield Promise.resolve();",
             "      $jscomp$async$super$get$98447280$5$bar().call($jscomp$async$this$98447280$3);",
             "    });",
@@ -3832,7 +3815,7 @@ public final class IntegrationTest extends IntegrationTestCase {
             "function foo() {",
             "  var JSCompiler_temp_const;",
             "  var JSCompiler_temp_const$jscomp$0;",
-            "  return $jscomp.asyncExecutePromiseGeneratorProgram(",
+            "  return (0, $jscomp.asyncExecutePromiseGeneratorProgram)(",
             "      function ($jscomp$generator$context$98447280$5) {",
             "        if ($jscomp$generator$context$98447280$5.nextAddress == 1) {",
             "          JSCompiler_temp_const = A;",
@@ -3942,7 +3925,8 @@ public final class IntegrationTest extends IntegrationTestCase {
             "async function abc() {",
             "  var $jscomp$forAwait$retFn0;",
             "  try {",
-            "    for (var $jscomp$forAwait$tempIterator0 = $jscomp.makeAsyncIterator(foo());;) {",
+            "    for (var $jscomp$forAwait$tempIterator0 = (0, $jscomp.makeAsyncIterator)(foo());;)"
+                + " {",
             "      var $jscomp$forAwait$tempResult0 = await $jscomp$forAwait$tempIterator0.next();",
             "      if ($jscomp$forAwait$tempResult0.done) {",
             "        break;",
@@ -4806,7 +4790,6 @@ public final class IntegrationTest extends IntegrationTestCase {
     CompilationLevel.ADVANCED_OPTIMIZATIONS.setOptionsForCompilationLevel(options);
     options.setLanguageOut(LanguageMode.ECMASCRIPT_2016);
 
-    options.setRemoveUnreachableCode(false);
     options.setRemoveUnusedVariables(Reach.NONE);
     options.setRemoveUnusedClassProperties(false);
 

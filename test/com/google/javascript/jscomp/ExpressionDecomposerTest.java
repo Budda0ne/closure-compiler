@@ -37,7 +37,7 @@ import com.google.javascript.rhino.jstype.JSTypeRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Function;
-import org.jspecify.nullness.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -1576,6 +1576,14 @@ public final class ExpressionDecomposerTest {
             "var temp_const$jscomp$1 = x;",
             "var temp_const$jscomp$0 = temp_const$jscomp$1.foo;",
             "temp_const$jscomp$0.call(temp_const$jscomp$1, y());"));
+  }
+
+  @Test
+  public void testExposeFreeCall() {
+    helperExposeExpression(
+        "(0,x.foo)(y())",
+        exprMatchesStr("y()"),
+        lines("var temp_const$jscomp$0 = x.foo;", "temp_const$jscomp$0(y());"));
   }
 
   @Test
